@@ -17,7 +17,9 @@ my ( $hw_ws, $net_ws )  = $xls->sheets();
 my %vm_info;
 my $hv_id;
 
-while ( my @hw_row = $hw_ws->next_row() ){
+while ( $hw_ws->has_data() ){
+    
+    my @hw_row = $hw_ws->next_row();
 
     # check if this row has an XS definition
 
