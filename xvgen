@@ -59,11 +59,11 @@ while ( $hw_ws->has_data() ){
 
     next if ! $hv_id;
    
-    if ( $hw_row[1] =~ /$vm_name/ ){
+    if ( defined $hw_row[1] && $hw_row[1] =~ /$vm_name/ ){
         
         my $name    = $hw_row[1];
         my $cpu     = $hw_row[2];
-        my $ram     = $hw_row[3];
+        my $ram     = $hw_row[3] * 1024;
  
         $hv_info{ $hv_id }{ $name } = {
                                 name    => $name,
@@ -77,5 +77,37 @@ while ( $hw_ws->has_data() ){
     }
 }
 
-print Dumper \%hv_info;
+#print Dumper \%hv_info;
+
+# do the template stuff
+
+for my $hv ( keys %hv_info ){
+    mkdir $hv;
+}
+__END__
+my $template = "
+
+#kernel = "/boot/xen/vmlinuz-xen_5.7"
+#ramdisk = "/boot/xen/initrd-xen_5.7.img"
+
+#Install
+#extra = "text ks=http://10.105.93.17/kickstart/ks-configs/PreInstall.XV.CGS.conf"
+#on_reboot = 'destroy'
+#on_crash = 'destroy'
+
+#Running
+bootloader="/usr/bin/pygrub"
+on_reboot = 'restart'
+on_crash = 'restart'
+
+name = "USCCNJXV07"
+memory = "4096"
+disk = [ 'tap:aio:/home/vm/USCCNJXV07.img,xvda,w', ]
+#vif = [ "mac=00:16:3E:2b:64:6b,bridge=xbr_v11" ]
+vif = [ "mac=00:16:3E:2b:64:6b,bridge=xbr_v11","mac=00:16:3E:2b:66:2b,bridge=xbr_v13" ]
+vcpus=2
+";
+
+say $template;
+
 
