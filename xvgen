@@ -1,0 +1,59 @@
+#!/usr/bin/perl
+
+use warnings;
+use strict;
+use 5.12.0;
+
+use Spreadsheet::ParseExcel;
+use Spreadsheet::ParseExcel::Simple;
+use Data::Dumper;
+
+my $wb = $ARGV[0];
+my $hv_name = "USNJXS";
+my $vm_name = "USNJXV";
+
+my $xls     = Spreadsheet::ParseExcel::Simple->read( $wb );
+my ( $hw_ws, $net_ws )  = $xls->sheets(); 
+my %vm_info;
+my $hv_id;
+
+while(1){
+    # compile core info for the vms
+
+    my @hw_row = $hw_ws->next_row();
+
+    # check if this row has an XS definition
+
+    if ( $hw_row[0] =~ /$hv_name\d\d/ ){
+        $hv_id = $hw_row[0];
+        next;
+    }
+
+    # next if we haven't found an XS yet
+    # we only generate configs for client vms
+
+    next if ! $hv_id;
+   
+    if ( $hw_row[1] =~ /$vm_name/ ){
+        
+        my $name    = $hw_row[1];
+        my $cpu     = $hw_row[2];
+        my $ram     = $hw_row[3];
+ 
+        $vm_info{ $hv_id }{ $name } = {
+                                name    => $name,
+                                cpu     => $cpu,
+                                ram     => $ram,
+                             };
+    }
+
+    # compile network info for the vm
+
+    my @row = $net_ws->next_row();
+    next until $row[0] =~ /$vm_name\d\d/;
+    
+#    $vm_info = (
+    say $_ for @row;
+    print Dumper \%vm_info;
+    exit;
+}
