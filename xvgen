@@ -8,12 +8,15 @@ use Spreadsheet::ParseExcel;
 use Spreadsheet::ParseExcel::Simple;
 use Data::Dumper;
 
-my $wb = $ARGV[0];
-my $hv_name = "USNJXS";
-my $vm_name = "USNJXV";
-my $ks_ip   = "10.104.93.17";
-my $xls     = Spreadsheet::ParseExcel::Simple->read( $wb );
+my $wb                  = $ARGV[0];
+my $hv_name             = "USNJXS";
+my $vm_name             = "USNJXV";
+my $ks_ip               = "10.104.93.17";
+my $xls                 = Spreadsheet::ParseExcel::Simple->read( $wb );
 my ( $hw_ws, $net_ws )  = $xls->sheets(); 
+
+# core containers
+
 my %hv_info;
 my $hv_id;
 
@@ -26,21 +29,22 @@ while ( $net_ws->has_data() ){
 
     # compile network info for the vm
 
-    my @row = $net_ws->next_row();
-    next until $row[0] =~ /$vm_name\d\d/;
+    my @row                 = $net_ws->next_row();
+    next until $row[0]      =~ /$vm_name\d\d/;
+    my $vm_id               = $row[0];
 
-    my $vm_id = $row[0];
+    my $eth1_ip         = $row[6];
+    ( $eth1_ip )        = $eth1_ip =~ /(\d+\.\d+\.\d+\.\d+)/;
 
-    my $eth1_ip = $row[6];
-    ( $eth1_ip ) = $eth1_ip =~ /(\d+\.\d+\.\d+\.\d+)/;
-
-    $vm_info{ $vm_id } = {
+    $vm_info{ $vm_id }  = {
                             eth0_vlan   => $row[3],
                             eth0_ip     => $row[4],
                             eth1_vlan   => $row[5],
                             eth1_ip     => $eth1_ip,
                         };
 }
+
+# iterate over all of the listed vm entries
 
 while ( $hw_ws->has_data() ){
     
@@ -65,9 +69,9 @@ while ( $hw_ws->has_data() ){
         my $ram     = $hw_row[3] * 1024;
  
         $hv_info{ $hv_id }{ $name } = {
-                                name    => $name,
-                                cpu     => $cpu,
-                                ram     => $ram,
+                                name        => $name,
+                                cpu         => $cpu,
+                                ram         => $ram,
                                 eth0_vlan   => $vm_info{ $name }{ eth0_vlan },
                                 eth1_vlan   => $vm_info{ $name }{ eth1_vlan },
                                 eth0_ip     => $vm_info{ $name }{ eth0_ip },
@@ -83,30 +87,35 @@ while ( $hw_ws->has_data() ){
 for my $hv ( keys %hv_info ){
     
     mkdir $hv;
+
     for my $vm ( keys %{ $hv_info{ $hv } } ){
 
-        my $eth0_ip     = $hv_info{ $hv }->{ $vm }{ eth0_ip };
-        my $eth0_vlan   = $hv_info{ $hv }->{ $vm }{ eth0_vlan };
-        my $eth1_ip     = $hv_info{ $hv }->{ $vm }{ eth1_ip };
-        my $eth1_vlan   = $hv_info{ $hv }->{ $vm }{ eth1_vlan };
+        my $xen_conf        = "$hv/$vm";
 
-        my $mac_prefix  = "00:16:3e";
+        my $eth0_ip         = $hv_info{ $hv }->{ $vm }{ eth0_ip };
+        my $eth0_vlan       = $hv_info{ $hv }->{ $vm }{ eth0_vlan };
+        my $eth1_ip         = $hv_info{ $hv }->{ $vm }{ eth1_ip };
+        my $eth1_vlan       = $hv_info{ $hv }->{ $vm }{ eth1_vlan };
 
-        my $eth0_mac = $mac_prefix;
-        my $eth1_mac = $mac_prefix;
+        my $mac_prefix      = "00:16:3e";
+
+        my $eth0_mac        = $mac_prefix;
+        my $eth1_mac        = $mac_prefix;
         
-        my @eth0_split_ip = split( /\./, $eth0_ip);
-        shift @eth0_split_ip;
+        my @eth0_split_ip   = split( /\./, $eth0_ip);
+
+        shift @eth0_split_ip; # first octet not needed for MAC translation
 
         for my $octet ( @eth0_split_ip ){
-            my $hex_octet = sprintf( "%x", $octet );
-            $hex_octet = "0$hex_octet" if length $hex_octet == 1;
-            $eth0_mac .= ":$hex_octet" 
+            my $hex_octet   = sprintf( "%x", $octet );
+            $hex_octet      = "0$hex_octet" if length $hex_octet == 1;
+            $eth0_mac       .= ":$hex_octet" 
         }
 
         if ( $eth1_ip ){
             my @eth1_split_ip = split( /\./, $eth1_ip);
-            shift @eth1_split_ip;
+
+            shift @eth1_split_ip; # again, dump the first IP octet
 
             for my $octet ( @eth1_split_ip ){
 
@@ -117,27 +126,29 @@ for my $hv ( keys %hv_info ){
             }
         }
 
-        print <<EOF;
-#kernel  = "/boot/xen/vmlinuz-xen_5.7"
-#ramdisk = "/boot/xen/initrd-xen_5.7.img"
+        open my $config_file, '>', $xen_conf
+          or die "Can't open the $xen_conf config file for writing!: $!";
+
+        print $config_file <<EOF;
+#kernel     = "/boot/xen/vmlinuz-xen_5.7"
+#ramdisk    = "/boot/xen/initrd-xen_5.7.img"
 
 #Install
-extra = "text ks=http://$ks_ip/kickstart/ks-configs/PreInstall.XV.CGS.conf"
-on_reboot = 'destroy'
-on_crash = 'destroy'
+extra       = "text ks=http://$ks_ip/kickstart/ks-configs/PreInstall.XV.CGS.conf"
+on_reboot   = 'destroy'
+on_crash    = 'destroy'
 
 #Running
-#bootloader="/usr/bin/pygrub"
-#on_reboot = 'restart'
-#on_crash = 'restart'
+#bootloader ="/usr/bin/pygrub"
+#on_reboot  = 'restart'
+#on_crash   = 'restart'
 
-name = "$vm"
-#memory = "vm"
-disk = [ 'tap:aio:/home/vm/$vm.img,xvda,w', ]
-#vif = [ "mac=00:16:3E:2b:64:6b,bridge=xbr_v11" ]
-vif = [ "mac=$eth0_mac,bridge=xbr_v$eth0_vlan","mac=$eth1_mac,bridge=xbr_v$eth1_vlan" ]
-vcpus=2
+name        = "$vm"
+memory      = "$hv_info{ $hv }->{ $vm }{ ram }"
+disk        = [ 'tap:aio:/home/vm/$vm.img,xvda,w', ]
+vif         = [ "mac=$eth0_mac,bridge=xbr_v$eth0_vlan","mac=$eth1_mac,bridge=xbr_v$eth1_vlan" ]
+vcpus       = $hv_info{ $hv }->{ $vm }{ cpu }
 EOF
-}
 
+        }
 }
