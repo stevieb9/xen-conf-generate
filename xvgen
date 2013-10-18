@@ -84,6 +84,39 @@ for my $hv ( keys %hv_info ){
     
     mkdir $hv;
     for my $vm ( keys %{ $hv_info{ $hv } } ){
+
+        my $eth0_ip     = $hv_info{ $hv }->{ $vm }{ eth0_ip };
+        my $eth0_vlan   = $hv_info{ $hv }->{ $vm }{ eth0_vlan };
+        my $eth1_ip     = $hv_info{ $hv }->{ $vm }{ eth1_ip };
+        my $eth1_vlan   = $hv_info{ $hv }->{ $vm }{ eth1_vlan };
+
+        my $mac_prefix  = "00:16:3e";
+
+        my $eth0_mac = $mac_prefix;
+        my $eth1_mac = $mac_prefix;
+        
+        my @eth0_split_ip = split( /\./, $eth0_ip);
+        shift @eth0_split_ip;
+
+        for my $octet ( @eth0_split_ip ){
+            my $hex_octet = sprintf( "%x", $octet );
+            $hex_octet = "0$hex_octet" if length $hex_octet == 1;
+            $eth0_mac .= ":$hex_octet" 
+        }
+
+        if ( $eth1_ip ){
+            my @eth1_split_ip = split( /\./, $eth1_ip);
+            shift @eth1_split_ip;
+
+            for my $octet ( @eth1_split_ip ){
+
+                my $hex_octet = sprintf( "%x", $octet );
+                $hex_octet = "0$hex_octet" if length $hex_octet == 1;
+                $eth1_mac .= ":$hex_octet" 
+
+            }
+        }
+
         print <<EOF;
 #kernel  = "/boot/xen/vmlinuz-xen_5.7"
 #ramdisk = "/boot/xen/initrd-xen_5.7.img"
@@ -100,9 +133,9 @@ on_crash = 'destroy'
 
 name = "$vm"
 #memory = "vm"
-disk = [ 'tap:aio:/home/vm/USCCNJXV07.img,xvda,w', ]
+disk = [ 'tap:aio:/home/vm/$vm.img,xvda,w', ]
 #vif = [ "mac=00:16:3E:2b:64:6b,bridge=xbr_v11" ]
-vif = [ "mac=00:16:3E:2b:64:6b,bridge=xbr_v11","mac=00:16:3E:2b:66:2b,bridge=xbr_v13" ]
+vif = [ "mac=$eth0_mac,bridge=xbr_v$eth0_vlan","mac=$eth1_mac,bridge=xbr_v$eth1_vlan" ]
 vcpus=2
 EOF
 }
