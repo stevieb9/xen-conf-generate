@@ -41,9 +41,8 @@ while ( $net_ws->has_data() ){
                             eth1_ip     => $eth1_ip,
                         };
 
-    print Dumper \%vm_info;
 }
-exit;
+
 while ( $hw_ws->has_data() ){
     
     my @hw_row = $hw_ws->next_row();
@@ -70,8 +69,13 @@ while ( $hw_ws->has_data() ){
                                 name    => $name,
                                 cpu     => $cpu,
                                 ram     => $ram,
-                             };
+                                eth0_vlan   => $vm_info{ $name }{ eth0_vlan },
+                                eth1_vlan   => $vm_info{ $name }{ eth1_vlan },
+                                eth0_ip     => $vm_info{ $name }{ eth0_ip },
+                                eth1_ip     => $vm_info{ $name }{ eth1_ip },
+                            };
     }
 }
 
+print Dumper \%hv_info;
 
