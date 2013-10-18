@@ -17,10 +17,7 @@ my ( $hw_ws, $net_ws )  = $xls->sheets();
 my %vm_info;
 my $hv_id;
 
-while(1){
-    # compile core info for the vms
-
-    my @hw_row = $hw_ws->next_row();
+while ( my @hw_row = $hw_ws->next_row() ){
 
     # check if this row has an XS definition
 
@@ -46,7 +43,11 @@ while(1){
                                 ram     => $ram,
                              };
     }
+}
 
+print Dumper \%vm_info;
+__END__
+while
     # compile network info for the vm
 
     my @row = $net_ws->next_row();
