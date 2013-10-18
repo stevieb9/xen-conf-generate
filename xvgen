@@ -11,7 +11,7 @@ use Data::Dumper;
 my $wb = $ARGV[0];
 my $hv_name = "USNJXS";
 my $vm_name = "USNJXV";
-
+my $ks_ip   = "10.104.93.17";
 my $xls     = Spreadsheet::ParseExcel::Simple->read( $wb );
 my ( $hw_ws, $net_ws )  = $xls->sheets(); 
 my %hv_info;
@@ -40,7 +40,6 @@ while ( $net_ws->has_data() ){
                             eth1_vlan   => $row[5],
                             eth1_ip     => $eth1_ip,
                         };
-
 }
 
 while ( $hw_ws->has_data() ){
@@ -49,7 +48,7 @@ while ( $hw_ws->has_data() ){
 
     # check if this row has an XS definition
 
-    if ( $hw_row[0] =~ /$hv_name\d\d/ ){
+    if ( defined $hw_row[0] && $hw_row[0]=~ /$hv_name\d\d/ ){
         $hv_id = $hw_row[0];
         next;
     }
@@ -82,32 +81,30 @@ while ( $hw_ws->has_data() ){
 # do the template stuff
 
 for my $hv ( keys %hv_info ){
+    
     mkdir $hv;
-}
-__END__
-my $template = "
-
-#kernel = "/boot/xen/vmlinuz-xen_5.7"
+    for my $vm ( keys %{ $hv_info{ $hv } } ){
+        print <<EOF;
+#kernel  = "/boot/xen/vmlinuz-xen_5.7"
 #ramdisk = "/boot/xen/initrd-xen_5.7.img"
 
 #Install
-#extra = "text ks=http://10.105.93.17/kickstart/ks-configs/PreInstall.XV.CGS.conf"
-#on_reboot = 'destroy'
-#on_crash = 'destroy'
+extra = "text ks=http://$ks_ip/kickstart/ks-configs/PreInstall.XV.CGS.conf"
+on_reboot = 'destroy'
+on_crash = 'destroy'
 
 #Running
-bootloader="/usr/bin/pygrub"
-on_reboot = 'restart'
-on_crash = 'restart'
+#bootloader="/usr/bin/pygrub"
+#on_reboot = 'restart'
+#on_crash = 'restart'
 
-name = "USCCNJXV07"
-memory = "4096"
+name = "$vm"
+#memory = "vm"
 disk = [ 'tap:aio:/home/vm/USCCNJXV07.img,xvda,w', ]
 #vif = [ "mac=00:16:3E:2b:64:6b,bridge=xbr_v11" ]
 vif = [ "mac=00:16:3E:2b:64:6b,bridge=xbr_v11","mac=00:16:3E:2b:66:2b,bridge=xbr_v13" ]
 vcpus=2
-";
+EOF
+}
 
-say $template;
-
-
+}
