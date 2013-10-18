@@ -14,9 +14,36 @@ my $vm_name = "USNJXV";
 
 my $xls     = Spreadsheet::ParseExcel::Simple->read( $wb );
 my ( $hw_ws, $net_ws )  = $xls->sheets(); 
-my %vm_info;
+my %hv_info;
 my $hv_id;
 
+# get the network info first, or we'll waste cycles
+# iterating repeatedly
+
+my %vm_info;
+
+while ( $net_ws->has_data() ){
+
+    # compile network info for the vm
+
+    my @row = $net_ws->next_row();
+    next until $row[0] =~ /$vm_name\d\d/;
+
+    my $vm_id = $row[0];
+
+    my $eth1_ip = $row[6];
+    ( $eth1_ip ) = $eth1_ip =~ /(\d+\.\d+\.\d+\.\d+)/;
+
+    $vm_info{ $vm_id } = {
+                            eth0_vlan   => $row[3],
+                            eth0_ip     => $row[4],
+                            eth1_vlan   => $row[5],
+                            eth1_ip     => $eth1_ip,
+                        };
+
+    print Dumper \%vm_info;
+}
+exit;
 while ( $hw_ws->has_data() ){
     
     my @hw_row = $hw_ws->next_row();
@@ -39,7 +66,7 @@ while ( $hw_ws->has_data() ){
         my $cpu     = $hw_row[2];
         my $ram     = $hw_row[3];
  
-        $vm_info{ $hv_id }{ $name } = {
+        $hv_info{ $hv_id }{ $name } = {
                                 name    => $name,
                                 cpu     => $cpu,
                                 ram     => $ram,
@@ -47,16 +74,4 @@ while ( $hw_ws->has_data() ){
     }
 }
 
-print Dumper \%vm_info;
-__END__
-while
-    # compile network info for the vm
 
-    my @row = $net_ws->next_row();
-    next until $row[0] =~ /$vm_name\d\d/;
-    
-#    $vm_info = (
-    say $_ for @row;
-    print Dumper \%vm_info;
-    exit;
-}
