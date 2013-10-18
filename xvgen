@@ -29,9 +29,9 @@ while ( $net_ws->has_data() ){
 
     # compile network info for the vm
 
-    my @row                 = $net_ws->next_row();
-    next until $row[0]      =~ /$vm_name\d\d/;
-    my $vm_id               = $row[0];
+    my @row             = $net_ws->next_row();
+    next until $row[0]  =~ /$vm_name\d\d/;
+    my $vm_id           = $row[0];
 
     my $eth1_ip         = $row[6];
     ( $eth1_ip )        = $eth1_ip =~ /(\d+\.\d+\.\d+\.\d+)/;
